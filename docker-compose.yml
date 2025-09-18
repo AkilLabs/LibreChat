@@ -9,7 +9,9 @@ services:
     depends_on:
       - mongodb
       - rag_api
-    image: ghcr.io/danny-avila/librechat-dev:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: always
     user: "${UID}:${GID}"
     extra_hosts:
@@ -32,6 +34,8 @@ services:
     image: mongo
     restart: always
     user: "${UID}:${GID}"
+    ports:
+      - "27017:27017"
     volumes:
       - ./data-node:/data/db
     command: mongod --noauth
@@ -40,6 +44,8 @@ services:
     image: getmeili/meilisearch:v1.12.3
     restart: always
     user: "${UID}:${GID}"
+    ports:
+      - "7700:7700"
     environment:
       - MEILI_HOST=http://meilisearch:7700
       - MEILI_NO_ANALYTICS=true
@@ -58,7 +64,11 @@ services:
       - pgdata2:/var/lib/postgresql/data
   rag_api:
     container_name: rag_api
-    image: ghcr.io/danny-avila/librechat-rag-api-dev-lite:latest
+    build:
+      context: ./rag_api
+      dockerfile: Dockerfile.lite
+    ports:
+      - "${RAG_PORT:-8000}:${RAG_PORT:-8000}"
     environment:
       - DB_HOST=vectordb
       - RAG_PORT=${RAG_PORT:-8000}

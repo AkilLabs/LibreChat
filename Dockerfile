@@ -36,6 +36,9 @@ RUN \
     npm config set fetch-retry-mintimeout 15000 ; \
     npm ci --no-audit
 
+# Install cross-env globally for production scripts
+RUN npm install -g cross-env
+
 COPY --chown=node:node . .
 
 RUN \
