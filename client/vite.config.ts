@@ -53,8 +53,8 @@ export default defineConfig(({ command }) => ({
       },
       includeAssets: [],
       manifest: {
-        name: 'LibreChat',
-        short_name: 'LibreChat',
+        name: 'NextRun Digital',
+        short_name: 'NextRun Digital',
         display: 'standalone',
         background_color: '#000000',
         theme_color: '#009688',
