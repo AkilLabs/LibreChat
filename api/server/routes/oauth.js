@@ -1,7 +1,6 @@
 // file deepcode ignore NoRateLimitingForLogin: Rate limiting is handled by the `loginLimiter` middleware
 const express = require('express');
 const passport = require('passport');
-const { randomState } = require('openid-client');
 const { logger } = require('@librechat/data-schemas');
 const { ErrorTypes } = require('librechat-data-provider');
 const { isEnabled, createSetBalanceConfig } = require('@librechat/api');
@@ -10,6 +9,15 @@ const { syncUserEntraGroupMemberships } = require('~/server/services/PermissionS
 const { setAuthTokens, setOpenIDAuthTokens } = require('~/server/services/AuthService');
 const { getAppConfig } = require('~/server/services/Config');
 const { Balance } = require('~/db/models');
+
+// Dynamic import for ES module openid-client
+let openIdClient;
+async function getOpenIdClient() {
+  if (!openIdClient) {
+    openIdClient = await import('openid-client');
+  }
+  return openIdClient;
+}
 
 const setBalanceConfig = createSetBalanceConfig({
   getAppConfig,

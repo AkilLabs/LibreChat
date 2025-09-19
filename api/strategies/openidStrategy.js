@@ -1,12 +1,23 @@
 const undici = require('undici');
 const fetch = require('node-fetch');
 const passport = require('passport');
-const client = require('openid-client');
 const jwtDecode = require('jsonwebtoken/decode');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const { hashToken, logger } = require('@librechat/data-schemas');
 const { CacheKeys, ErrorTypes } = require('librechat-data-provider');
-const { Strategy: OpenIDStrategy } = require('openid-client/passport');
+
+// Dynamic import for ES module openid-client
+let client;
+let OpenIDStrategy;
+
+async function initializeOpenIDClient() {
+  if (!client) {
+    const openidClient = await import('openid-client');
+    client = openidClient;
+    OpenIDStrategy = openidClient.Strategy;
+  }
+  return { client, OpenIDStrategy };
+}
 const {
   isEnabled,
   logHeaders,
@@ -100,13 +111,14 @@ let openidConfig = null;
 //overload currenturl function because of express version 4 buggy req.host doesn't include port
 //More info https://github.com/panva/openid-client/pull/713
 
-class CustomOpenIDStrategy extends OpenIDStrategy {
-  currentUrl(req) {
-    const hostAndProtocol = process.env.DOMAIN_SERVER;
-    return new URL(`${hostAndProtocol}${req.originalUrl ?? req.url}`);
-  }
+function createCustomOpenIDStrategy(OpenIDStrategy) {
+  return class CustomOpenIDStrategy extends OpenIDStrategy {
+    currentUrl(req) {
+      const hostAndProtocol = process.env.DOMAIN_SERVER;
+      return new URL(`${hostAndProtocol}${req.originalUrl ?? req.url}`);
+    }
 
-  authorizationRequestParams(req, options) {
+    authorizationRequestParams(req, options) {
     const params = super.authorizationRequestParams(req, options);
     if (options?.state && !params.has('state')) {
       params.set('state', options.state);
@@ -130,6 +142,7 @@ class CustomOpenIDStrategy extends OpenIDStrategy {
 
     return params;
   }
+  };
 }
 
 /**
@@ -150,7 +163,9 @@ const exchangeAccessTokenIfNeeded = async (config, accessToken, sub, fromCache =
         return cachedToken.access_token;
       }
     }
-    const grantResponse = await client.genericGrantRequest(
+    // Get client dynamically when needed
+    const { client: openidClient } = await initializeOpenIDClient();
+    const grantResponse = await openidClient.genericGrantRequest(
       config,
       'urn:ietf:params:oauth:grant-type:jwt-bearer',
       {
@@ -181,7 +196,9 @@ const exchangeAccessTokenIfNeeded = async (config, accessToken, sub, fromCache =
 const getUserInfo = async (config, accessToken, sub) => {
   try {
     const exchangedAccessToken = await exchangeAccessTokenIfNeeded(config, accessToken, sub);
-    return await client.fetchUserInfo(config, exchangedAccessToken, sub);
+    // Get client dynamically when needed
+    const { client: openidClient } = await initializeOpenIDClient();
+    return await openidClient.fetchUserInfo(config, exchangedAccessToken, sub);
   } catch (error) {
     logger.error('[openidStrategy] getUserInfo: Error fetching user info:', error);
     return null;
@@ -292,6 +309,10 @@ function convertToUsername(input, defaultValue = '') {
  */
 async function setupOpenId() {
   try {
+    // Initialize openid-client dynamically
+    const { client: openidClient, OpenIDStrategy: OpenIDStrategyClass } = await initializeOpenIDClient();
+    const CustomOpenIDStrategy = createCustomOpenIDStrategy(OpenIDStrategyClass);
+    
     const shouldGenerateNonce = isEnabled(process.env.OPENID_GENERATE_NONCE);
 
     /** @type {ClientMetadata} */
@@ -307,13 +328,13 @@ async function setupOpenId() {
     }
 
     /** @type {Configuration} */
-    openidConfig = await client.discovery(
+    openidConfig = await openidClient.discovery(
       new URL(process.env.OPENID_ISSUER),
       process.env.OPENID_CLIENT_ID,
       clientMetadata,
       undefined,
       {
-        [client.customFetch]: customFetch,
+        [openidClient.customFetch]: customFetch,
       },
     );
 

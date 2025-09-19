@@ -28,12 +28,23 @@ jest.mock('~/server/services/Files/strategies', () => ({
 }));
 
 const mongoose = require('mongoose');
-const client = require('openid-client');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const { Client } = require('@microsoft/microsoft-graph-client');
 const { getOpenIdConfig } = require('~/strategies/openidStrategy');
 const getLogStores = require('~/cache/getLogStores');
 const GraphApiService = require('./GraphApiService');
+
+// Mock openid-client for tests
+const client = {
+  genericGrantRequest: jest.fn(),
+};
+
+// Mock dynamic import
+jest.mock('openid-client', () => ({
+  __esModule: true,
+  default: client,
+  ...client,
+}));
 
 describe('GraphApiService', () => {
   let mongoServer;

@@ -2,7 +2,15 @@ const { getOpenIdConfig } = require('~/strategies/openidStrategy');
 const { logger } = require('~/config');
 const { CacheKeys } = require('librechat-data-provider');
 const getLogStores = require('~/cache/getLogStores');
-const client = require('openid-client');
+
+// Dynamic import for ES module openid-client
+let client;
+async function getOpenIdClient() {
+  if (!client) {
+    client = await import('openid-client');
+  }
+  return client;
+}
 
 /**
  * Get Microsoft Graph API token using existing token exchange mechanism
@@ -45,7 +53,8 @@ async function getGraphApiToken(user, accessToken, scopes, fromCache = true) {
     logger.debug(`[GraphTokenService] Requesting new Graph API token for user: ${user.openidId}`);
     logger.debug(`[GraphTokenService] Requested scopes: ${scopes}`);
 
-    const grantResponse = await client.genericGrantRequest(
+    const openIdClient = await getOpenIdClient();
+    const grantResponse = await openIdClient.genericGrantRequest(
       config,
       'urn:ietf:params:oauth:grant-type:jwt-bearer',
       {
